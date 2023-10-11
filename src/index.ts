@@ -21,11 +21,11 @@ const game: Game = {
         /**
          * Keeps track of how many times a floor has been called
          */
-        const floorCallUpRecord: Record<number, number> = {}
-        const floorCallDownRecord: Record<number, number> = {}
+        const floorCallUpRecord: Record<number, number[]> = {}
+        const floorCallDownRecord: Record<number, number[]> = {}
         floors.forEach((floor, index) => {
-            floorCallUpRecord[index] = 0
-            floorCallDownRecord[index] = 0
+            floorCallUpRecord[index] = []
+            floorCallDownRecord[index] = []
         })
 
         const getElevator = (elevatorIdx: number) => augmentedElevators[elevatorIdx]
@@ -34,11 +34,12 @@ const game: Game = {
         const handleElevatorFloorButtonPressed = (elevatorIdx: number, floorNum: number) => {}
 
         const handleElevatorCallButtonPressed = (floorNum: number, direction: Direction) => {
+            console.log(floors)
             console.log(`Floor ${floorNum} called for ${direction}`)
             if (direction === "up") {
-                floorCallUpRecord[floorNum]++
+                floorCallUpRecord[floorNum].push(Date.now())
             } else {
-                floorCallDownRecord[floorNum]++
+                floorCallDownRecord[floorNum].push(Date.now())
             }
 
             // for each elevator, if it does not have any pressed floors, and its demand queue is empty, then go to the floor
@@ -58,7 +59,7 @@ const game: Game = {
             // Combine demand of both floor call records
             const floorCallRecord: Record<number, number> = {}
             for (const floorNum in floorCallUpRecord) {
-                floorCallRecord[floorNum] = floorCallUpRecord[floorNum] + floorCallDownRecord[floorNum]
+                floorCallRecord[floorNum] = floorCallUpRecord[floorNum].length + floorCallDownRecord[floorNum].length
             }
             return floorCallRecord
         }
@@ -130,9 +131,9 @@ const game: Game = {
             }
 
             if (elevatorNextDirection === 'up') {
-                floorCallUpRecord[currentFloorNum] = 0
+                floorCallUpRecord[currentFloorNum] = []
             } else {
-                floorCallDownRecord[currentFloorNum] = 0
+                floorCallDownRecord[currentFloorNum] = []
             }
         }
 
@@ -141,7 +142,7 @@ const game: Game = {
             console.log(`Elevator ${elevatorIdx} passing floor ${floorNum} going ${direction}`)
             const elevator = getElevator(elevatorIdx)
             const elevatorLoadFactor = elevator.loadFactor()
-            const demandForNextFloor = direction === 'up' ? floorCallUpRecord[floorNum] : floorCallDownRecord[floorNum]
+            const demandForNextFloor = direction === 'up' ? floorCallUpRecord[floorNum].length : floorCallDownRecord[floorNum].length
 
             if (elevatorLoadFactor < 0.7 && demandForNextFloor > 0) {
                 elevator.goToFloor(floorNum, true)
@@ -171,7 +172,9 @@ const game: Game = {
         })
     },
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    update: function(dt, elevators, floors) {}
+    update: function(dt, elevators, floors) {
+        // We normally don't need to do anything here
+    }
 }
 
 
@@ -257,6 +260,7 @@ export interface Floor {
     floorNum: () => number;
     on: (event: "up_button_pressed" | "down_button_pressed", callback: (args?: unknown[]) => void) => void
 }
+
 
 
 // #######################
