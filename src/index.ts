@@ -20,11 +20,12 @@ const game: Game = {
 
         /**
          * Keeps track of how many times a floor has been called
-         * // TODO somehow add direction into here
          */
-        const floorCallRecord: Record<number, number> = {}
+        const floorCallUpRecord: Record<number, number> = {}
+        const floorCallDownRecord: Record<number, number> = {}
         floors.forEach((floor, index) => {
-            floorCallRecord[index] = 0
+            floorCallUpRecord[index] = 0
+            floorCallDownRecord[index] = 0
         })
 
         const getElevator = (elevatorIdx: number) => augmentedElevators[elevatorIdx]
@@ -34,7 +35,11 @@ const game: Game = {
 
         const handleElevatorCallButtonPressed = (floorNum: number, direction: Direction) => {
             console.log(`Floor ${floorNum} called for ${direction}`)
-            floorCallRecord[floorNum]++
+            if (direction === "up") {
+                floorCallUpRecord[floorNum]++
+            } else {
+                floorCallDownRecord[floorNum]++
+            }
 
             // for each elevator, if it does not have any pressed floors, and its demand queue is empty, then go to the floor
             for (let i = 0; i < elevators.length; i++) {
@@ -49,7 +54,19 @@ const game: Game = {
             }
         }
 
+        const combineFloorCallRecords = (): Record<number, number> => {
+            // Combine demand of both floor call records
+            const floorCallRecord: Record<number, number> = {}
+            for (const floorNum in floorCallUpRecord) {
+                floorCallRecord[floorNum] = floorCallUpRecord[floorNum] + floorCallDownRecord[floorNum]
+            }
+            return floorCallRecord
+        }
+
         const highestDemandFloor = (): number => {
+            // Combine demand of both floor call records
+            const floorCallRecord = combineFloorCallRecords()
+
             let highestDemandFloorNum = 0
             let highestDemandFloorCount = 0
             for (const floorNum in floorCallRecord) {
@@ -78,6 +95,7 @@ const game: Game = {
 
         const decideNextFloorForElevator = (elevatorIdx: number, currentFloorNum: number) => {
             console.log(`Elevator ${elevatorIdx} stopped at floor ${currentFloorNum}`)
+            const floorCallRecord = combineFloorCallRecords()
             const elevator = getElevator(elevatorIdx)
             const elevatorPressedFloors = elevator.getPressedFloors()
             const elevatorLoadFactor = elevator.loadFactor()
@@ -86,25 +104,35 @@ const game: Game = {
             console.log(`Floor demand: ${JSON.stringify(floorCallRecord)}`)
 
             // Remove current floor number from floor record
-            floorCallRecord[currentFloorNum] = 0
+            let elevatorNextDirection: Direction = "stopped"
 
             if (elevatorLoadFactor > 0.7 && elevatorPressedFloors.length > 0) {
                 const closestPressedFloor = getClosestPressedFloorToElevator(elevatorIdx)
                 console.log(`Elevator ${elevatorIdx} is full, going to closest pressed floor ${closestPressedFloor}`)
                 elevator.goToFloor(closestPressedFloor)
+                elevatorNextDirection = closestPressedFloor > currentFloorNum ? "up" : "down"
             } else {
                 if (highestFloorDemand > 0 && highestDemandFloorNum !== currentFloorNum) {
                     // go to the highest demand floor
                     console.log(`Elevator ${elevatorIdx} is not full, going to highest demand floor ${highestDemandFloorNum}`)
                     elevator.goToFloor(highestDemandFloorNum)
+                    elevatorNextDirection = highestDemandFloorNum > currentFloorNum ? "up" : "down"
                 } else if (elevatorPressedFloors.length > 0) {
                     const closestPressedFloor = getClosestPressedFloorToElevator(elevatorIdx)
                     console.log(`Elevator ${elevatorIdx} is not full, going to closest pressed floor ${closestPressedFloor}`)
                     elevator.goToFloor(closestPressedFloor)
+                    elevatorNextDirection = closestPressedFloor > currentFloorNum ? "up" : "down"
                 } else {
                     console.log(`Elevator ${elevatorIdx} is not full, going to ground floor`)
                     elevator.goToFloor(0)
+                    elevatorNextDirection = "down"
                 }
+            }
+
+            if (elevatorNextDirection === 'up') {
+                floorCallUpRecord[currentFloorNum] = 0
+            } else {
+                floorCallDownRecord[currentFloorNum] = 0
             }
         }
 
@@ -113,7 +141,7 @@ const game: Game = {
             console.log(`Elevator ${elevatorIdx} passing floor ${floorNum} going ${direction}`)
             const elevator = getElevator(elevatorIdx)
             const elevatorLoadFactor = elevator.loadFactor()
-            const demandForNextFloor = floorCallRecord[floorNum]
+            const demandForNextFloor = direction === 'up' ? floorCallUpRecord[floorNum] : floorCallDownRecord[floorNum]
 
             if (elevatorLoadFactor < 0.7 && demandForNextFloor > 0) {
                 elevator.goToFloor(floorNum, true)
