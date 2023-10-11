@@ -35,6 +35,16 @@ const game: Game = {
         const handleElevatorCallButtonPressed = (floorNum: number, direction: Direction) => {
             console.log(`Floor ${floorNum} called for ${direction}`)
             floorCallRecord[floorNum]++
+
+            // for each elevator, if it does not have any pressed floors, and its demand queue is empty, then go to the floor
+            augmentedElevators.forEach((elevator, index) => {
+                const elevatorPressedFloors = elevator.getPressedFloors()
+                const elevatorDestinationQueue = elevator.destinationQueue
+                if (elevatorPressedFloors.length === 0 && elevatorDestinationQueue.length === 0) {
+                    console.log(`Elevator ${index} is idle, going to floor ${floorNum}`)
+                    elevator.goToFloor(floorNum)
+                }
+            })
         }
 
         const highestDemandFloor = (): number => {
@@ -49,6 +59,21 @@ const game: Game = {
             return highestDemandFloorNum
         }
 
+        /**
+         * Gets the closest pressed floor to the elevator
+         * @param elevatorIdx
+         */
+        const getClosestPressedFloorToElevator = (elevatorIdx: number): number => {
+            const elevator = getElevator(elevatorIdx)
+            const elevatorPressedFloors = elevator.getPressedFloors()
+            const currentFloorNum = elevator.currentFloor()
+            // Get the closest pressed floor that isn't the current floor
+            const closestPressedFloor = elevatorPressedFloors.reduce((prev, curr) => {
+                return (Math.abs(curr - currentFloorNum) < Math.abs(prev - currentFloorNum) ? curr : prev)
+            })
+            return closestPressedFloor
+        }
+
         const decideNextFloorForElevator = (elevatorIdx: number, currentFloorNum: number) => {
             console.log(`Elevator ${elevatorIdx} stopped at floor ${currentFloorNum}`)
             const elevator = getElevator(elevatorIdx)
@@ -56,35 +81,43 @@ const game: Game = {
             const elevatorLoadFactor = elevator.loadFactor()
             const highestDemandFloorNum = highestDemandFloor()
             const highestFloorDemand = floorCallRecord[highestDemandFloorNum]
+            console.log(`Floor demand: ${JSON.stringify(floorCallRecord)}`)
 
             // Remove current floor number from floor record
             floorCallRecord[currentFloorNum] = 0
 
-            if (elevatorLoadFactor > 0.7) {
-                // go to the closest pressed floor
-                const closestPressedFloor = elevatorPressedFloors.reduce((prev, curr) => {
-                    return (Math.abs(curr - currentFloorNum) < Math.abs(prev - currentFloorNum) ? curr : prev)
-                })
+            if (elevatorLoadFactor > 0.7 && elevatorPressedFloors.length > 0) {
+                const closestPressedFloor = getClosestPressedFloorToElevator(elevatorIdx)
                 console.log(`Elevator ${elevatorIdx} is full, going to closest pressed floor ${closestPressedFloor}`)
                 elevator.goToFloor(closestPressedFloor)
             } else {
-                if (highestFloorDemand > 0) {
+                if (highestFloorDemand > 0 && highestDemandFloorNum !== currentFloorNum) {
                     // go to the highest demand floor
                     console.log(`Elevator ${elevatorIdx} is not full, going to highest demand floor ${highestDemandFloorNum}`)
                     elevator.goToFloor(highestDemandFloorNum)
-                } else {
-                    // go to the closest pressed floor
-                    const closestPressedFloor = elevatorPressedFloors.reduce((prev, curr) => {
-                        return (Math.abs(curr - currentFloorNum) < Math.abs(prev - currentFloorNum) ? curr : prev)
-                    })
+                } else if (elevatorPressedFloors.length > 0) {
+                    const closestPressedFloor = getClosestPressedFloorToElevator(elevatorIdx)
                     console.log(`Elevator ${elevatorIdx} is not full, going to closest pressed floor ${closestPressedFloor}`)
                     elevator.goToFloor(closestPressedFloor)
+                } else {
+                    console.log(`Elevator ${elevatorIdx} is not full, going to ground floor`)
+                    elevator.goToFloor(0)
                 }
             }
         }
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const checkElevatorPassingFloor = (elevatorIdx:number, floorNum: number, direction: Omit<Direction, "stop">) => {}
+        const checkElevatorPassingFloor = (elevatorIdx:number, floorNum: number, direction: Omit<Direction, "stop">) => {
+            console.log(`Elevator ${elevatorIdx} passing floor ${floorNum} going ${direction}`)
+            const elevator = getElevator(elevatorIdx)
+            const elevatorLoadFactor = elevator.loadFactor()
+            const demandForNextFloor = floorCallRecord[floorNum]
+
+            if (elevatorLoadFactor < 0.7 && demandForNextFloor > 0) {
+                elevator.goToFloor(floorNum, true)
+                console.log(`Elevator ${elevatorIdx} is not full, making ad-hoc stop at floor ${floorNum}`)
+            }
+        }
 
 
         // #######################
@@ -192,7 +225,7 @@ export interface Floor {
      * @returns The floor number.
      */
     floorNum: () => number;
-    on: (event: "up_button_pressed" | "down_button_pressed", callback: (args?: any[]) => void) => void
+    on: (event: "up_button_pressed" | "down_button_pressed", callback: (args?: unknown[]) => void) => void
 }
 
 
