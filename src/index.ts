@@ -37,14 +37,16 @@ const game: Game = {
             floorCallRecord[floorNum]++
 
             // for each elevator, if it does not have any pressed floors, and its demand queue is empty, then go to the floor
-            augmentedElevators.forEach((elevator, index) => {
+            for (let i = 0; i < elevators.length; i++) {
+                const elevator = getElevator(i)
                 const elevatorPressedFloors = elevator.getPressedFloors()
                 const elevatorDestinationQueue = elevator.destinationQueue
                 if (elevatorPressedFloors.length === 0 && elevatorDestinationQueue.length === 0) {
-                    console.log(`Elevator ${index} is idle, going to floor ${floorNum}`)
+                    console.log(`Elevator ${i} is idle, going to floor ${floorNum}`)
                     elevator.goToFloor(floorNum)
+                    break
                 }
-            })
+            }
         }
 
         const highestDemandFloor = (): number => {
